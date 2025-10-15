@@ -13,7 +13,7 @@ A simple FastAPI + ffmpeg web app to split videos into parts, zip them, and down
 
 Requirements: Docker & docker-compose
 
-1. Clone repo (or copy files into `video-splitter/`)
+1. Clone repo using ``git clone https://github.com/wyznel/ChopChop.git``
 2. From project root run:
 ```bash
 docker compose up --build
