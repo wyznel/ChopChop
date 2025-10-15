@@ -3,7 +3,7 @@ services:
     build: .
     container_name: chopchop
     ports:
-      - "8080:8000"   # host 8080 -> container 8000
+      - "9013:8000"   # host 8080 -> container 8000
     volumes:
       - ./uploads:/uploads
       - ./app/static:/app/static:ro
