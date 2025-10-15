@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  videosplitter:
+    build: .
+    container_name: video-splitter
+    ports:
+      - "8080:8000"   # host 8080 -> container 8000
+    volumes:
+      - ./uploads:/uploads
+      - ./app/static:/app/static:ro
+    environment:
+      - UPLOAD_ROOT=/uploads
+    restart: unless-stopped
