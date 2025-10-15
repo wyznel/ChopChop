@@ -1,8 +1,7 @@
-version: "3.8"
 services:
   videosplitter:
     build: .
-    container_name: video-splitter
+    container_name: chopchop
     ports:
       - "8080:8000"   # host 8080 -> container 8000
     volumes:
