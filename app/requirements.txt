@@ -1,0 +1,19 @@
+# --- Core dependencies ---
+fastapi==0.100.0
+uvicorn[standard]==0.22.0
+pydantic==1.10.11
+python-multipart==0.0.6
+starlette==0.27.0
+
+# --- Video processing ---
+moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# --- Async file handling ---
+aiofiles==23.2.1
+
+# --- Progress display and logging ---
+tqdm==4.66.5
+
+# --- Production utilities ---
+gunicorn==21.2.0

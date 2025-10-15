@@ -1,0 +1,159 @@
+<!-- app/static/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Video Splitter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-2xl bg-white rounded-2xl shadow-lg p-6">
+    <h1 class="text-2xl font-semibold mb-4">Video Splitter</h1>
+    <p class="text-sm text-slate-500 mb-4">Upload a video, choose how to split it, and download a ZIP with the parts.</p>
+
+    <form id="uploadForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Video file</label>
+        <input type="file" id="file" accept="video/*" class="border rounded p-2 w-full"/>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Split mode</label>
+        <div class="flex items-center gap-4">
+          <label class="inline-flex items-center">
+            <input type="radio" name="mode" value="count" checked class="mr-2"/>
+            Split by count
+          </label>
+          <label class="inline-flex items-center">
+            <input type="radio" name="mode" value="size" class="mr-2"/>
+            Split by size (MB)
+          </label>
+        </div>
+      </div>
+
+      <div id="countBox">
+        <label class="block text-sm font-medium mb-1">Number of parts</label>
+        <input type="number" id="count" min="1" value="2" class="border rounded p-2 w-40"/>
+      </div>
+
+      <div id="sizeBox" class="hidden">
+        <label class="block text-sm font-medium mb-1">Max size per part (MB)</label>
+        <input type="number" id="size_mb" min="1" value="50" class="border rounded p-2 w-40"/>
+      </div>
+
+      <div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Start split</button>
+      </div>
+    </form>
+
+    <div id="statusArea" class="mt-6 hidden">
+      <div class="mb-2 text-sm text-slate-600" id="statusText"></div>
+      <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+        <div id="progressBar" class="h-3 bg-blue-500 w-0"></div>
+      </div>
+      <div class="mt-3" id="downloadArea"></div>
+    </div>
+  </div>
+
+<script>
+const form = document.getElementById("uploadForm");
+const modeInputs = document.querySelectorAll("input[name='mode']");
+const countBox = document.getElementById("countBox");
+const sizeBox = document.getElementById("sizeBox");
+const statusArea = document.getElementById("statusArea");
+const statusText = document.getElementById("statusText");
+const progressBar = document.getElementById("progressBar");
+const downloadArea = document.getElementById("downloadArea");
+
+modeInputs.forEach(i => i.addEventListener("change", () => {
+  if (document.querySelector("input[name='mode']:checked").value === "count") {
+    countBox.classList.remove("hidden");
+    sizeBox.classList.add("hidden");
+  } else {
+    countBox.classList.add("hidden");
+    sizeBox.classList.remove("hidden");
+  }
+}));
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById("file");
+  if (!fileInput.files.length) {
+    alert("Please pick a video file.");
+    return;
+  }
+  const mode = document.querySelector("input[name='mode']:checked").value;
+  const fd = new FormData();
+  fd.append("file", fileInput.files[0]);
+  fd.append("mode", mode);
+  if (mode === "count") {
+    fd.append("count", document.getElementById("count").value);
+  } else {
+    fd.append("size_mb", document.getElementById("size_mb").value);
+  }
+
+  statusArea.classList.remove("hidden");
+  statusText.textContent = "Uploading...";
+  progressBar.style.width = "10%";
+  downloadArea.innerHTML = "";
+
+  try {
+    const resp = await fetch("/upload", { method: "POST", body: fd });
+    const json = await resp.json();
+    if (!resp.ok) {
+      statusText.textContent = "Upload failed: " + (json.error || JSON.stringify(json));
+      return;
+    }
+    const jobId = json.job_id;
+    statusText.textContent = "Uploaded. Job ID: " + jobId;
+    progressBar.style.width = "20%";
+
+    // Poll status
+    const interval = setInterval(async () => {
+      const sresp = await fetch(`/status/${jobId}`);
+      if (!sresp.ok) {
+        clearInterval(interval);
+        statusText.textContent = "Error checking status.";
+        return;
+      }
+      const s = await sresp.json();
+      if (s.status === "queued") {
+        statusText.textContent = "Queued...";
+      } else if (s.status === "processing") {
+        statusText.textContent = s.message || "Processing...";
+      } else if (s.status === "finished") {
+        statusText.textContent = "Finished. Preparing download...";
+        progressBar.style.width = "100%";
+        clearInterval(interval);
+        const a = document.createElement("a");
+        a.href = `/download/${jobId}`;
+        a.textContent = "Download ZIP";
+        a.className = "inline-block mt-2 text-white bg-green-600 px-3 py-2 rounded";
+        downloadArea.appendChild(a);
+      } else if (s.status === "error") {
+        statusText.textContent = "Error: " + (s.message || "unknown");
+        clearInterval(interval);
+      } else {
+        statusText.textContent = JSON.stringify(s);
+      }
+
+      // Update progress bar heuristically
+      if (s.total_parts && s.completed_parts !== undefined) {
+        let pct = Math.round((s.completed_parts / s.total_parts) * 100);
+        progressBar.style.width = Math.min(Math.max(pct, 20), 99) + "%";
+      } else {
+        // small increment to show activity
+        let cur = parseInt(progressBar.style.width) || 20;
+        cur = Math.min(cur + 2, 95);
+        progressBar.style.width = cur + "%";
+      }
+    }, 1500);
+  } catch (err) {
+    statusText.textContent = "Upload error: " + err.message;
+  }
+});
+</script>
+
+</body>
+</html>
